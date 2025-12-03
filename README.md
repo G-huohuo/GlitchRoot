@@ -18,7 +18,7 @@
 
 > 你可以在浏览器中直接打开 `index.html` 查看效果。
 
-（你发布后我可以帮你生成 GitHub Pages 链接 & 预览图）
+https://g-huohuo.github.io/GlitchRoot/
 
 ---
 
