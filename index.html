@@ -282,7 +282,8 @@
 
     .main {
       display: grid;
-      grid-template-columns: minmax(0, 2.3fr) minmax(0, 1.7fr);
+      /* 🟡 调整左右列比例：右侧略宽，左边视觉上不那么“空” */
+      grid-template-columns: minmax(0, 1.7fr) minmax(0, 2.3fr);
       gap: 18px;
       align-items: stretch;
     }
@@ -721,6 +722,12 @@
             这里本来应该是一个“正常页面”。<br />
             但你撞进了 <strong>秘密实验室</strong>。
           </p>
+          <div class="hint">
+            <span class="hint-dot"></span>
+            <span>
+              你可以把所有迷路的流量都丢到这里来玩一圈再走。
+            </span>
+          </div>
         </section>
 
         <aside class="actions">
