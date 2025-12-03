@@ -19,6 +19,7 @@
 > 你可以在浏览器中直接打开 `index.html` 查看效果。
 
 https://g-huohuo.github.io/GlitchRoot/
+<img width="2560" height="1196" alt="image" src="https://github.com/user-attachments/assets/7897a5ff-9ac2-4564-94d0-d307abb713bd" />
 
 ---
 
