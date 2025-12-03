@@ -25,5 +25,17 @@
 ## 📦 部署方式
 
 ### **方式一：直接放到根域名**
-将 `index.html` 上传到你的服务器根目录：
+将 `index.html` 上传到你的服务器根目录：/var/www/html/index.html
 
+### **方式二：GitHub Pages**
+1. Push 到仓库
+2. 打开 Settings → Pages
+3. Source 选 `main` 分支
+4. 保存后即可访问 `https://你的用户名.github.io/GlitchRoot/`
+
+### **方式三：Nginx 作为兜底页**
+```nginx
+error_page 404 /index.html;
+location = /index.html {
+    root /path/to/GlitchRoot;
+}
