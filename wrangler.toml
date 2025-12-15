@@ -1,4 +1,5 @@
-name = "glitch-root"
+# wrangler.toml
+name = 'glitchroot'
 compatibility_date = "2025-12-15"
 
 [assets]
