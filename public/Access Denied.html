@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>安全检查 | 知识拾光站</title>
+  <style>
+    :root {
+      --bg-0: #070b18;
+      --bg-1: #0b1229;
+      --card: rgba(17, 25, 40, 0.62);
+      --card-strong: rgba(17, 25, 40, 0.78);
+      --line: rgba(255,255,255,0.10);
+
+      --primary: #22d3ee;   /* 霓虹青 */
+      --primary-2: #a78bfa; /* 霓虹紫 */
+      --danger: #fb7185;    /* 更柔的警示红 */
+      --warn: #fbbf24;
+
+      --text: #eaf2ff;
+      --muted: rgba(234,242,255,0.60);
+
+      --shadow: 0 28px 70px rgba(0,0,0,0.55);
+      --shadow-danger: 0 28px 70px rgba(251, 113, 133, 0.15);
+
+      --radius: 18px;
+
+      --font-sans: ui-sans-serif, system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", Roboto, Arial, sans-serif;
+      --font-mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: var(--font-sans);
+      color: var(--text);
+      background: radial-gradient(1200px 600px at 15% 30%, rgba(34,211,238,0.12), transparent 60%),
+                  radial-gradient(900px 500px at 85% 25%, rgba(167,139,250,0.10), transparent 55%),
+                  linear-gradient(180deg, var(--bg-0), var(--bg-1));
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    /* 背景：网格 + 光晕 + 噪点 */
+    .bg {
+      position: fixed;
+      inset: 0;
+      z-index: -3;
+      pointer-events: none;
+    }
+
+    .bg::before {
+      content: "";
+      position: absolute;
+      inset: -20%;
+      background:
+        repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0, rgba(255,255,255,0.05) 1px, transparent 1px, transparent 32px),
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.04) 0, rgba(255,255,255,0.04) 1px, transparent 1px, transparent 32px);
+      transform: translate3d(0,0,0);
+      mask-image: radial-gradient(closest-side, rgba(0,0,0,0.8), transparent);
+      opacity: 0.35;
+      animation: gridFloat 14s ease-in-out infinite alternate;
+    }
+
+    .bg::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(circle at 20% 50%, rgba(34,211,238,0.10), transparent 50%),
+        radial-gradient(circle at 80% 35%, rgba(167,139,250,0.10), transparent 55%);
+      filter: blur(0px);
+      animation: aura 10s ease-in-out infinite alternate;
+      opacity: 0.9;
+    }
+
+    .noise {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.25'/%3E%3C/svg%3E");
+      opacity: 0.20;
+      mix-blend-mode: overlay;
+    }
+
+    @keyframes gridFloat {
+      from { transform: translate(-2%, -2%) scale(1); }
+      to   { transform: translate(2%, 2%) scale(1.03); }
+    }
+    @keyframes aura {
+      from { transform: scale(1); opacity: 0.85; }
+      to   { transform: scale(1.05); opacity: 0.95; }
+    }
+
+    /* 顶部品牌 */
+    .brand-header {
+      position: sticky;
+      top: 0;
+      padding: 26px 16px 10px;
+      text-align: center;
+      z-index: 5;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      background: linear-gradient(180deg, rgba(7,11,24,0.65), rgba(7,11,24,0));
+    }
+
+    .brand-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      font-size: 18px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      color: var(--text);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    }
+
+    .brand-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-2));
+      box-shadow: 0 0 18px rgba(34,211,238,0.55);
+    }
+
+    /* 布局 */
+    .wrap {
+      min-height: calc(100vh - 84px);
+      display: grid;
+      place-items: center;
+      padding: 18px 16px 28px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 560px;
+      perspective: 1100px;
+    }
+
+    /* 卡片：渐变描边 + 玻璃拟态 */
+    .glass-card {
+      position: relative;
+      border-radius: var(--radius);
+      padding: 34px 34px 26px;
+      box-shadow: var(--shadow);
+      transform-style: preserve-3d;
+      transition: transform 240ms ease, box-shadow 300ms ease;
+
+      /* 渐变边框技巧：双背景 */
+      background:
+        linear-gradient(var(--card), var(--card)) padding-box,
+        linear-gradient(135deg, rgba(34,211,238,0.55), rgba(167,139,250,0.35), rgba(255,255,255,0.10)) border-box;
+      border: 1px solid transparent;
+
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      overflow: hidden;
+    }
+
+    .glass-card::before {
+      content: "";
+      position: absolute;
+      inset: -60% -30%;
+      background: conic-gradient(from 180deg, rgba(34,211,238,0.18), rgba(167,139,250,0.12), rgba(34,211,238,0.18));
+      filter: blur(28px);
+      opacity: 0.6;
+      animation: bloom 8s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+
+    .glass-card::after {
+      /* 扫光 */
+      content: "";
+      position: absolute;
+      top: -30%;
+      left: -60%;
+      width: 60%;
+      height: 160%;
+      transform: skewX(-18deg);
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+      animation: shine 3.2s infinite;
+      pointer-events: none;
+    }
+
+    @keyframes shine { 100% { left: 160%; } }
+    @keyframes bloom { from { transform: rotate(0deg) scale(1); } to { transform: rotate(18deg) scale(1.06); } }
+
+    /* 上部图标区 */
+    .status-icon-wrapper {
+      width: 92px;
+      height: 92px;
+      margin: 0 auto 18px;
+      position: relative;
+      display: grid;
+      place-items: center;
+      transform: translateZ(22px);
+    }
+
+    .radar {
+      position: absolute;
+      inset: 0;
+      border-radius: 999px;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(34,211,238,0.14), transparent 55%),
+        conic-gradient(from 90deg, rgba(34,211,238,0.00), rgba(34,211,238,0.35), rgba(34,211,238,0.00));
+      mask-image: radial-gradient(circle at 50% 50%, rgba(0,0,0,1) 62%, transparent 66%);
+      animation: spin 1.8s linear infinite;
+      filter: drop-shadow(0 0 12px rgba(34,211,238,0.35));
+    }
+
+    .ring {
+      position: absolute;
+      inset: 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(34,211,238,0.28);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+    }
+
+    .badge {
+      width: 54px;
+      height: 54px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 14px 30px rgba(0,0,0,0.35);
+      font-size: 26px;
+      transition: transform 380ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 240ms ease;
+      opacity: 0.0;
+      transform: scale(0.8);
+    }
+
+    .badge.on {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .card-title {
+      text-align: center;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      margin: 6px 0 18px;
+      font-size: 18px;
+      color: rgba(234,242,255,0.95);
+      transform: translateZ(18px);
+    }
+
+    .subtitle {
+      text-align: center;
+      margin-top: -8px;
+      margin-bottom: 18px;
+      color: var(--muted);
+      font-size: 13px;
+      transform: translateZ(16px);
+    }
+
+    /* 终端窗口：加顶栏 */
+    .terminal {
+      position: relative;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.07);
+      background: rgba(0,0,0,0.38);
+      overflow: hidden;
+      box-shadow: inset 0 2px 18px rgba(0,0,0,0.35);
+      transform: translateZ(14px);
+    }
+
+    .terminal-topbar {
+      height: 34px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 8px;
+      background: rgba(255,255,255,0.04);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .dot { width: 9px; height: 9px; border-radius: 50%; opacity: 0.9; }
+    .dot.r { background: rgba(251,113,133,0.9); }
+    .dot.y { background: rgba(251,191,36,0.9); }
+    .dot.g { background: rgba(34,197,94,0.9); }
+    .terminal-title {
+      margin-left: 8px;
+      font-size: 12px;
+      color: rgba(234,242,255,0.65);
+      font-family: var(--font-mono);
+      letter-spacing: 0.2px;
+    }
+
+    .terminal-body {
+      height: 150px;
+      padding: 14px 14px 12px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.5;
+      color: rgba(34,211,238,0.95);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 4px;
+    }
+
+    .log-entry {
+      opacity: 0;
+      transform: translateY(8px);
+      animation: slideIn 220ms forwards;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .timestamp { color: rgba(234,242,255,0.55); margin-right: 10px; }
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      margin-right: 8px;
+      font-size: 11px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+      color: rgba(234,242,255,0.72);
+    }
+
+    @keyframes slideIn {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 进度条 + 数字 */
+    .progress-wrap {
+      margin-top: 14px;
+      transform: translateZ(12px);
+    }
+
+    .progress-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 10px;
+      color: rgba(234,242,255,0.70);
+      font-size: 12px;
+    }
+
+    .progress-container {
+      height: 6px;
+      background: rgba(255,255,255,0.10);
+      border-radius: 999px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, rgba(34,211,238,0.95), rgba(167,139,250,0.75));
+      box-shadow: 0 0 18px rgba(34,211,238,0.45);
+      transition: width 0.25s ease;
+      border-radius: 999px;
+    }
+
+    /* 拦截信息 */
+    .denied-info {
+      display: none;
+      margin-top: 18px;
+      text-align: center;
+      animation: fadeIn 0.45s ease both;
+      transform: translateZ(10px);
+    }
+
+    .kv {
+      margin-top: 10px;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+    }
+
+    .data-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px dashed rgba(255,255,255,0.10);
+      font-size: 14px;
+    }
+    .data-row:last-child { border-bottom: 0; }
+
+    .data-label { color: rgba(234,242,255,0.55); }
+    .data-value { font-family: var(--font-mono); letter-spacing: 0.8px; }
+
+    .reason {
+      margin: 14px 0 0;
+      color: rgba(234,242,255,0.65);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .actions {
+      margin-top: 16px;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.06);
+      color: rgba(234,242,255,0.9);
+      padding: 10px 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: transform 120ms ease, background 180ms ease, border-color 180ms ease;
+    }
+
+    .btn:hover {
+      background: rgba(255,255,255,0.10);
+      border-color: rgba(34,211,238,0.35);
+      transform: translateY(-1px);
+    }
+
+    .btn.primary {
+      background: linear-gradient(135deg, rgba(34,211,238,0.18), rgba(167,139,250,0.14));
+      border-color: rgba(34,211,238,0.35);
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 18px;
+      font-size: 12px;
+      color: rgba(234,242,255,0.35);
+      text-align: center;
+      padding: 0 12px;
+    }
+
+    .footer a {
+      color: rgba(234,242,255,0.35);
+      text-decoration: none;
+      margin: 0 6px;
+      transition: color 0.25s;
+    }
+
+    .footer a:hover { color: rgba(34,211,238,0.85); }
+
+    /* blocked 状态 */
+    body.state-blocked .glass-card {
+      background:
+        linear-gradient(var(--card-strong), var(--card-strong)) padding-box,
+        linear-gradient(135deg, rgba(251,113,133,0.55), rgba(167,139,250,0.25), rgba(255,255,255,0.08)) border-box;
+      box-shadow: var(--shadow-danger);
+    }
+
+    body.state-blocked .radar,
+    body.state-blocked .ring { display: none; }
+
+    body.state-blocked .badge {
+      opacity: 1;
+      transform: scale(1);
+      filter: drop-shadow(0 0 18px rgba(251,113,133,0.35));
+    }
+
+    body.state-blocked .card-title { color: rgba(251,113,133,0.95); }
+    body.state-blocked .subtitle { color: rgba(234,242,255,0.65); }
+
+    body.state-blocked .terminal { display: none; }
+    body.state-blocked .progress-wrap { display: none; }
+    body.state-blocked .denied-info { display: block; }
+
+    body.state-blocked .bg::after {
+      background-image: radial-gradient(circle at 50% 50%, rgba(251,113,133,0.14), transparent 60%);
+      opacity: 1;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* 移动端 */
+    @media (max-width: 520px) {
+      .glass-card { padding: 26px 18px 20px; border-radius: 16px; }
+      .terminal-body { height: 150px; font-size: 12px; }
+      .brand-logo { font-size: 16px; }
+    }
+
+    /* 降动效 */
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+      .glass-card::after { display: none; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="bg" aria-hidden="true"></div>
+  <div class="noise" aria-hidden="true"></div>
+
+  <div class="brand-header">
+    <div class="brand-logo">
+      <span class="brand-dot"></span>
+      知识拾光站
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="container">
+      <div class="glass-card" id="securityCard" role="status" aria-live="polite">
+        <div class="status-icon-wrapper" aria-hidden="true">
+          <div class="radar" id="scanner"></div>
+          <div class="ring"></div>
+          <div class="badge" id="badge">🚫</div>
+        </div>
+
+        <div class="card-title" id="statusText">正在进行环境安全扫描...</div>
+        <div class="subtitle" id="subText">请稍候，正在验证指纹与网络特征</div>
+
+        <div class="terminal" id="terminal">
+          <div class="terminal-topbar">
+            <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+            <span class="terminal-title">K-Shield / Secure Console</span>
+          </div>
+          <div class="terminal-body" id="terminalBody">
+            <div class="log-entry"><span class="timestamp">[SYSTEM]</span><span class="tag">BOOT</span>Initializing security protocol...</div>
+          </div>
+        </div>
+
+        <div class="progress-wrap">
+          <div class="progress-head">
+            <span>扫描进度</span>
+            <span id="progressText">0%</span>
+          </div>
+          <div class="progress-container">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+        </div>
+
+        <div class="denied-info" id="deniedInfo">
+          <div class="kv" role="group" aria-label="拦截详情">
+            <div class="data-row">
+              <span class="data-label">访问结果</span>
+              <span class="data-value" style="color: var(--danger)">ACCESS_DENIED</span>
+            </div>
+            <div class="data-row">
+              <span class="data-label">客户端 IP</span>
+              <span class="data-value" id="userIP">Checking...</span>
+            </div>
+            <div class="data-row">
+              <span class="data-label">风险等级</span>
+              <span class="data-value" style="color: var(--danger)">CRITICAL</span>
+            </div>
+            <div class="data-row">
+              <span class="data-label">拦截节点</span>
+              <span class="data-value">Firewall-CN-North-03</span>
+            </div>
+            <div class="data-row">
+              <span class="data-label">拦截代码</span>
+              <span class="data-value">#9002_BLACKLIST</span>
+            </div>
+          </div>
+
+          <p class="reason">
+            系统检测到您的网络指纹与黑名单数据库匹配。<br />
+            为保障“知识拾光站”的数据安全，连接已被强制断开。
+          </p>
+
+          <div class="actions">
+            <button class="btn primary" onclick="location.reload()">重新检测</button>
+            <button class="btn" onclick="alert('如需解除拦截，请联系站点管理员并提供拦截代码。')">联系管理员</button>
+          </div>
+        </div>
+
+        <div class="footer">
+          <p>&copy; 2024 Knowledge Light Station. Security provided by K-Shield.</p>
+          <p><a href="#">京ICP备88888888号-1</a> • <a href="#">公网安备 11010802020202号</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const terminalBody = document.getElementById('terminalBody');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const statusText = document.getElementById('statusText');
+    const subText = document.getElementById('subText');
+    const badge = document.getElementById('badge');
+    const userIPDisplay = document.getElementById('userIP');
+    const card = document.getElementById('securityCard');
+
+    // 轻微 3D 倾斜（桌面端）
+    (function enableTilt(){
+      const isTouch = matchMedia('(pointer: coarse)').matches;
+      if (isTouch) return;
+      card.addEventListener('mousemove', (e) => {
+        const r = card.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width - 0.5;
+        const y = (e.clientY - r.top) / r.height - 0.5;
+        const rx = (-y * 5).toFixed(2);
+        const ry = (x * 7).toFixed(2);
+        card.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
+      });
+      card.addEventListener('mouseleave', () => {
+        card.style.transform = 'rotateX(0deg) rotateY(0deg)';
+      });
+    })();
+
+    function log(message, type = 'INFO') {
+      const now = new Date();
+      const timeStr = now.toTimeString().split(' ')[0];
+
+      let color = 'rgba(34,211,238,0.95)';
+      let tag = 'INFO';
+      if (type === 'WARN') { color = 'rgba(251,191,36,0.95)'; tag = 'WARN'; }
+      if (type === 'ERR')  { color = 'rgba(251,113,133,0.95)'; tag = 'ALERT'; }
+
+      const div = document.createElement('div');
+      div.className = 'log-entry';
+      div.innerHTML = `<span class="timestamp">[${timeStr}]</span><span class="tag">${tag}</span><span style="color:${color}">${message}</span>`;
+      terminalBody.appendChild(div);
+
+      // 保持最多 7 行
+      while (terminalBody.childElementCount > 7) {
+        terminalBody.removeChild(terminalBody.firstElementChild);
+      }
+    }
+
+    async function getIP() {
+      try {
+        const res = await fetch('https://api.ipify.org?format=json', { cache: 'no-store' });
+        const data = await res.json();
+        return data.ip;
+      } catch (e) {
+        return '112.48.' + Math.floor(Math.random() * 255) + '.' + Math.floor(Math.random() * 255);
+      }
+    }
+
+    function setProgress(p) {
+      progressBar.style.width = p + '%';
+      progressText.textContent = p + '%';
+    }
+
+    async function runSecurityCheck() {
+      let ip = "Unknown";
+      getIP().then(res => ip = res);
+
+      const steps = [
+        { t: 450,  msg: "Establishing secure handshake...", p: 12 },
+        { t: 980,  msg: "Analyzing browser fingerprint...", p: 28 },
+        { t: 720,  msg: "Verifying TCP/IP stack integrity...", p: 46 },
+        { t: 980,  msg: "Fetching global blacklist database...", p: 64 },
+        { t: 760,  msg: "Comparing signature hashes...", p: 82 },
+        { t: 620,  msg: "Abnormal traffic pattern detected!", type: "WARN", p: 92 },
+        { t: 620,  msg: "Triggering active defense protocol...", type: "ERR",  p: 100 },
+      ];
+
+      setProgress(0);
+      for (const step of steps) {
+        await new Promise(r => setTimeout(r, step.t));
+        log(step.msg, step.type || 'INFO');
+        setProgress(step.p);
+      }
+
+      setTimeout(() => triggerBlock(ip), 650);
+    }
+
+    function triggerBlock(ip) {
+      document.body.classList.add('state-blocked');
+
+      statusText.textContent = "访问被拒绝 (Access Denied)";
+      subText.textContent = "拦截已生效：连接已强制断开";
+      userIPDisplay.textContent = ip;
+
+      badge.classList.add('on');
+
+      let blink = false;
+      setInterval(() => {
+        document.title = blink ? "⚠ 访问被拦截 | 知识拾光站" : "🚫 Security Alert | Knowledge Light Station";
+        blink = !blink;
+      }, 1000);
+    }
+
+    window.addEventListener('load', runSecurityCheck);
+  </script>
+</body>
+</html>
